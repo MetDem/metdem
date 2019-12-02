@@ -5,8 +5,6 @@ library work;
 use work.constants.all;
 
 entity uart_top is
-
-generic (M : integer:=125000000/115200);
     port( 
         clk : in std_logic;
 
@@ -33,8 +31,8 @@ signal o_ready : std_logic;
 component uart_unpacker is 
 port ( 
         i_clk      : in std_logic;                           
-        i_rx_ready : in std_logic;
-        i_rx       : in std_logic_vector(D downto 0);
+        i_unpacker_ready : in std_logic;
+        i_unpacker       : in std_logic_vector(D downto 0);
         
         o_unpacker   : out std_logic_vector(D downto 0); 
         o_ready    : out std_logic);
@@ -67,8 +65,6 @@ port(
      i_data: in std_logic_vector(7 downto 0));
 end component;
 
-signal o_tx : std_logic;
-signal o_tx_done : std_logic_vector;
 
 component uart_rx is 
 port(
@@ -79,34 +75,54 @@ port(
     o_rx_ready : out std_logic);
 end component;
 
-signal o_data_intermediate : std_logic_vector(7 downto 0);
-signal o_data_ready_intermediate : std_logic;
-signal i_data_intermediate : std_logic_vector(7 downto 0);
-signal i_start_intermediate : std_logic;
+signal o_data_intermediate_vs_i_packer : std_logic_vector(7 downto 0);
+signal o_data_ready_intermediate_vs_i_packer_ready : std_logic;
+signal i_data_intermediate_vs_o_unpacker : std_logic_vector(7 downto 0);
+signal i_start_intermediate_vs_o_unpacker_ready : std_logic;
 
-signal i_start : std_logic;
+signal o_packer_vs_i_data : std_logic_vector(7 downto 0);
+signal o_ready_vs_i_start : std_logic;
+
+signal o_tx_vs_i_rx : std_logic;
+
+signal o_data_vs_i_unpacker : std_logic_vector(7 downto 0);
+signal o_rx_ready_vs_unpacker_ready : std_logic;
+
+
 
 begin
 
-StagePc_comm : uart_pc port map( clk=>clk,i_rx=>uart_rx_i, 
-o_data_intermediate=>o_data_intermediate, 
-o_data_ready_intermediate=>o_data_ready_intermediate, 
-i_data_intermediate=>i_data_intermediate ,
-i_start_intermediate=>i_start_intermediate ,
-o_tx=>uart_tx_o ,o_tx_done=>open );
-
-StageTx : uart_tx port map( clk=>clk, i_start=>o_ready, 
-i_data=>o_packer, 
-o_tx=>o_tx, 
+StagePc_comm : uart_pc port map(clk=>clk, i_rx=>uart_rx_i,
+o_data_intermediate=>o_data_intermediate_vs_i_packer,
+o_data_ready_intermediate=>o_data_ready_intermediate_vs_i_packer_ready,
+i_data_intermediate=>i_data_intermediate_vs_o_unpacker,
+i_start_intermediate=>i_start_intermediate_vs_o_unpacker_ready,
+o_tx=>uart_tx_o,
 o_tx_done=>open );
 
-StageRx : uart_rx port map( clk=>clk, i_rx=>o_tx, 
-o_data=>"unpacker input", 
-o_data_ready=>"unpacker input" );
+StagePacker : uart_packer port map(i_clk=>clk,
+i_packer=>o_data_intermediate_vs_i_packer,
+i_packer_ready=>o_data_ready_intermediate_vs_i_packer_ready,
+o_packer=>o_packer_vs_i_data,
+o_ready=>o_ready_vs_i_start);
 
 
-                
+StageTx : uart_tx port map(clk=>clk,
+i_start=>o_ready_vs_i_start, 
+i_data=>o_packer_vs_i_data,
+o_tx=>o_tx_vs_i_rx,
+o_tx_done=>open );
 
+StageRx : uart_rx port map( clk=>clk, i_rx=>o_tx_vs_i_rx, 
+o_data=>o_data_vs_i_unpacker, 
+o_rx_ready=>o_rx_ready_vs_unpacker_ready);
+
+StageUnpacker : uart_unpacker port map(i_clk=>clk,
+i_unpacker_ready=> o_rx_ready_vs_unpacker_ready,
+i_unpacker=> o_data_vs_i_unpacker,
+o_unpacker=>i_data_intermediate_vs_o_unpacker ,
+o_ready =>i_start_intermediate_vs_o_unpacker_ready);
+  
 
 
 end rtl;
