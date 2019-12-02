@@ -5,8 +5,6 @@ library work;
 use work.constants.all;
 
 entity uart_pc is
-    generic  ( M : integer  );
-
     port(
         clk : in std_logic;
         -- input from Rx Side
